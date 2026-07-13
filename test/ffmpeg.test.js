@@ -1,7 +1,8 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildSelectExpr, buildArgs, validFps } = require('../src/ffmpeg');
+const path = require('node:path');
+const { buildSelectExpr, buildArgs, validFps, resolveBinary } = require('../src/ffmpeg');
 
 test('buildSelectExpr nối các đoạn bằng dấu +', () => {
   assert.strictEqual(
@@ -51,4 +52,41 @@ test('validFps chấp nhận num/den hợp lệ, loại bỏ 0/0 và rác', () =
   assert.strictEqual(validFps('25'), null);
   assert.strictEqual(validFps(undefined), null);
   assert.strictEqual(validFps(null), null);
+});
+
+test('resolveBinary: biến môi trường FFMPEG_PATH được ưu tiên cao nhất', () => {
+  const r = resolveBinary('ffmpeg', {
+    env: { FFMPEG_PATH: '/custom/ffmpeg' }, isPackaged: true, platform: 'win32',
+    execDir: '/opt/app', exists: () => true,
+  });
+  assert.strictEqual(r, '/custom/ffmpeg');
+});
+
+test('resolveBinary: khi đóng gói, dùng binary .exe cạnh exe nếu tồn tại', () => {
+  const expected = path.join('/opt/app', 'ffmpeg.exe');
+  const r = resolveBinary('ffmpeg', {
+    env: {}, isPackaged: true, platform: 'win32', execDir: '/opt/app',
+    exists: (p) => p === expected,
+  });
+  assert.strictEqual(r, expected);
+});
+
+test('resolveBinary: ffprobe dùng đúng key FFPROBE_PATH và không thêm .exe khi non-win', () => {
+  const expected = path.join('/opt/app', 'ffprobe');
+  const r = resolveBinary('ffprobe', {
+    env: {}, isPackaged: true, platform: 'linux', execDir: '/opt/app',
+    exists: (p) => p === expected,
+  });
+  assert.strictEqual(r, expected);
+});
+
+test('resolveBinary: không đóng gói -> trả tên trần (dựa PATH)', () => {
+  assert.strictEqual(resolveBinary('ffmpeg', { env: {}, isPackaged: false }), 'ffmpeg');
+});
+
+test('resolveBinary: đóng gói nhưng không thấy file cạnh exe -> fallback PATH', () => {
+  const r = resolveBinary('ffmpeg', {
+    env: {}, isPackaged: true, platform: 'win32', execDir: '/opt/app', exists: () => false,
+  });
+  assert.strictEqual(r, 'ffmpeg');
 });

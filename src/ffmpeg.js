@@ -1,5 +1,30 @@
 'use strict';
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+// Xác định đường dẫn binary ffmpeg/ffprobe theo thứ tự ưu tiên:
+//   1. Biến môi trường FFMPEG_PATH / FFPROBE_PATH
+//   2. Khi đã đóng gói (pkg): file ffmpeg(.exe) nằm CẠNH file thực thi
+//   3. Fallback: tên trần "ffmpeg"/"ffprobe" (dựa vào PATH của hệ thống)
+// Các phụ thuộc được truyền vào để dễ unit test.
+function resolveBinary(name, opts = {}) {
+  const {
+    env = process.env,
+    platform = process.platform,
+    isPackaged = Boolean(process.pkg),
+    execDir = path.dirname(process.execPath),
+    exists = (p) => { try { return fs.existsSync(p); } catch { return false; } },
+  } = opts;
+  const envVal = env[`${name.toUpperCase()}_PATH`];
+  if (envVal) return envVal;
+  if (isPackaged) {
+    const suffix = platform === 'win32' ? '.exe' : '';
+    const candidate = path.join(execDir, name + suffix);
+    if (exists(candidate)) return candidate;
+  }
+  return name;
+}
 
 function buildSelectExpr(segments) {
   return segments.map(([s, e]) => `between(t,${s},${e})`).join('+');
@@ -49,14 +74,17 @@ function checkBinary(bin) {
 }
 
 async function checkFfmpeg() {
-  const [ff, fp] = await Promise.all([checkBinary('ffmpeg'), checkBinary('ffprobe')]);
+  const [ff, fp] = await Promise.all([
+    checkBinary(resolveBinary('ffmpeg')),
+    checkBinary(resolveBinary('ffprobe')),
+  ]);
   return { ffmpeg: ff.ok, ffprobe: fp.ok, version: ff.version };
 }
 
 function probe(file) {
   return new Promise((resolve, reject) => {
     const args = ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,r_frame_rate', '-of', 'json', file];
-    const p = spawn('ffprobe', args);
+    const p = spawn(resolveBinary('ffprobe'), args);
     let out = '';
     let err = '';
     p.stdout.on('data', (d) => { out += d; });
@@ -84,7 +112,7 @@ function runCut(opts, { onProgress, signal } = {}) {
   return new Promise((resolve, reject) => {
     const args = buildArgs(opts);
     const totalKeep = opts.segments.reduce((a, [s, e]) => a + (e - s), 0);
-    const p = spawn('ffmpeg', args, { signal });
+    const p = spawn(resolveBinary('ffmpeg'), args, { signal });
     let err = '';
     p.stderr.on('data', (d) => {
       const s = d.toString();
@@ -103,4 +131,4 @@ function runCut(opts, { onProgress, signal } = {}) {
   });
 }
 
-module.exports = { buildSelectExpr, buildArgs, validFps, checkFfmpeg, probe, runCut };
+module.exports = { buildSelectExpr, buildArgs, validFps, resolveBinary, checkFfmpeg, probe, runCut };

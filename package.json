@@ -5,9 +5,18 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "build:win": "node scripts/build-win.mjs"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*"
+    ]
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.14.2"
   }
 }
