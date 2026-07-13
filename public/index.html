@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Video Tool</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-ic">🎬</span> Video Tool</div>
+      <div class="menu-label">MENU</div>
+      <nav id="nav">
+        <button class="nav-item active" data-screen="cut">✂️ Cắt &amp; Nối Video</button>
+        <button class="nav-item" data-screen="ph">✏️ Đổi tên hàng loạt</button>
+        <button class="nav-item" data-screen="ph">🔄 Chuẩn hóa &amp; Fill</button>
+        <button class="nav-item" data-screen="ph">🎲 Random Video</button>
+        <button class="nav-item" data-screen="ph">🧩 Merge Stock Random</button>
+        <button class="nav-item" data-screen="ph">↔️ Change-file</button>
+        <button class="nav-item" data-screen="ph">🔽 Filter Stock</button>
+        <button class="nav-item" data-screen="ph">✨ Ảnh + Video</button>
+        <button class="nav-item" data-screen="ph">🖼️ Ảnh + Stock + Video</button>
+        <button class="nav-item" data-screen="ph">🔧 Tách Block</button>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <h1 id="screenTitle">Cắt &amp; Nối Video</h1>
+        <span class="ver">v1.0</span>
+      </header>
+
+      <div id="healthBanner" class="banner hidden"></div>
+
+      <section id="cutScreen">
+        <div class="card guide">
+          <button id="guideToggle" class="guide-head">
+            <span>❓ Hướng dẫn sử dụng</span><span class="chev">▾</span>
+          </button>
+          <div id="guideBody" class="guide-body">
+            <p>1. Chọn thư mục chứa video → <b>QUÉT &amp; XEM TRƯỚC</b>.</p>
+            <p>2. Đặt độ dài đoạn <b>giữ</b> (mặc định 3–5s) và đoạn <b>bỏ</b> (mặc định 0.4–0.5s).</p>
+            <p>3. Nhấn <b>THỰC HIỆN</b>. Mỗi video sẽ được cắt ngẫu nhiên, bỏ các khoảng ngắn rồi nối lại, xuất ra thư mục đầu ra dưới tên <code>&lt;tên&gt;_cut.mp4</code>.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <div class="field grow">
+              <label>Thư mục video</label>
+              <input id="folder" type="text" placeholder="Đường dẫn thư mục chứa video" />
+            </div>
+            <button id="btnBrowse" class="btn btn-ghost">📁 CHỌN THƯ MỤC</button>
+          </div>
+          <div class="row">
+            <div class="field grow">
+              <label>Thư mục xuất (để trống = &lt;thư mục video&gt;/output)</label>
+              <input id="outDir" type="text" placeholder="Tự động: <thư mục video>/output" />
+            </div>
+            <button id="btnScan" class="btn btn-blue">🔍 QUÉT &amp; XEM TRƯỚC</button>
+          </div>
+          <div class="row params">
+            <div class="field"><label>Giữ min (s)</label><input id="keepMin" type="number" step="0.1" min="0.1" value="3" /></div>
+            <div class="field"><label>Giữ max (s)</label><input id="keepMax" type="number" step="0.1" min="0.1" value="5" /></div>
+            <div class="field"><label>Bỏ min (s)</label><input id="gapMin" type="number" step="0.1" min="0.1" value="0.4" /></div>
+            <div class="field"><label>Bỏ max (s)</label><input id="gapMax" type="number" step="0.1" min="0.1" value="0.5" /></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <table class="preview">
+            <thead><tr><th>#</th><th>Tên file</th><th>Dung lượng</th></tr></thead>
+            <tbody id="previewBody"><tr><td colspan="3" class="empty">Chưa quét thư mục</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="card action-bar">
+          <div class="progress-wrap">
+            <div class="progress"><div id="totalBar" class="progress-fill"></div></div>
+            <span id="totalPct" class="pct">0%</span>
+          </div>
+          <div class="btns">
+            <button id="btnRun" class="btn btn-green">✅ THỰC HIỆN</button>
+            <button id="btnStop" class="btn btn-red hidden">■ DỪNG</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="log-head">🎞️ Nhật ký hoạt động</div>
+          <div id="log" class="log"></div>
+        </div>
+      </section>
+
+      <section id="placeholder" class="hidden">
+        <div class="card placeholder">🚧 Tính năng đang phát triển.</div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span>Chọn thư mục</span>
+        <button id="modalClose" class="x">✕</button>
+      </div>
+      <div class="modal-path"><button id="modalUp" class="btn btn-ghost sm">⬆ Lên</button><span id="modalPath"></span></div>
+      <ul id="modalList" class="modal-list"></ul>
+      <div class="modal-foot"><button id="modalPick" class="btn btn-blue">Chọn thư mục này</button></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
