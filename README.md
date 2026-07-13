@@ -8,11 +8,42 @@ Cắt mỗi video thành các đoạn ngẫu nhiên (mặc định **3–5s**), 
 
 ## Yêu cầu
 
-- **Node.js 20+**
-- **ffmpeg + ffprobe** phải có trong `PATH`.
-  - Ubuntu/Debian: `sudo apt install ffmpeg`
-  - hoặc tải bản static: https://johnvansickle.com/ffmpeg/ rồi thêm vào `PATH`.
-  - Kiểm tra: `ffmpeg -version` và `ffprobe -version`.
+- **Node.js 20+** (https://nodejs.org)
+- **ffmpeg + ffprobe** phải có trong `PATH` (xem cách cài bên dưới).
+
+Kiểm tra sau khi cài:
+
+```bash
+ffmpeg -version
+ffprobe -version
+```
+
+Thấy `ffmpeg version ...` là được. Trong app, nếu chưa có ffmpeg sẽ hiện banner đỏ cảnh báo
+và nút **THỰC HIỆN** bị khóa.
+
+### Cài ffmpeg trên Linux (Ubuntu/Debian)
+
+```bash
+sudo apt install ffmpeg
+```
+
+Hoặc tải bản static: https://johnvansickle.com/ffmpeg/ rồi thêm vào `PATH`.
+
+### Cài ffmpeg trên Windows (tải thủ công, không cần package manager)
+
+1. Tải bản build Windows: **https://www.gyan.dev/ffmpeg/builds/** → mục *release builds* →
+   `ffmpeg-release-essentials.zip`
+   (nguồn khác: https://github.com/BtbN/FFmpeg-Builds/releases).
+2. Giải nén, ví dụ vào `C:\ffmpeg`. Bên trong có thư mục `bin` chứa `ffmpeg.exe` và `ffprobe.exe`
+   (đường dẫn đầy đủ: `C:\ffmpeg\bin`).
+3. Thêm `C:\ffmpeg\bin` vào **PATH**:
+   - Nhấn **Start** → gõ *environment variables* → mở **Edit the system environment variables**
+     → nút **Environment Variables…**
+   - Ở mục **Path** (trong *User variables* hoặc *System variables*) → **Edit** → **New** →
+     dán `C:\ffmpeg\bin` → **OK** ở tất cả cửa sổ.
+4. **Mở lại** terminal (PowerShell/CMD) để PATH cập nhật, rồi chạy `ffmpeg -version` để kiểm tra.
+
+> Trên Windows, đường dẫn thư mục nhập vào app dùng kiểu Windows, ví dụ `D:\videos\input`.
 
 ## Chạy
 
