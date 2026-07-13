@@ -120,7 +120,7 @@ app.post('/api/process', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5390;
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Video Tool chạy tại http://localhost:${PORT}`));
 }

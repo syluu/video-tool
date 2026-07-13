@@ -19,10 +19,10 @@ Cắt mỗi video thành các đoạn ngẫu nhiên (mặc định **3–5s**), 
 ```bash
 npm install
 npm start
-# mở http://localhost:3000
+# mở http://localhost:5390
 ```
 
-Đổi cổng: `PORT=3100 npm start`.
+Đổi cổng: `PORT=8642 npm start`.
 
 ## Sử dụng
 
