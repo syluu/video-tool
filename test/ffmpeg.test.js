@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildSelectExpr, buildArgs } = require('../src/ffmpeg');
+const { buildSelectExpr, buildArgs, validFps } = require('../src/ffmpeg');
 
 test('buildSelectExpr nối các đoạn bằng dấu +', () => {
   assert.strictEqual(
@@ -32,4 +32,23 @@ test('buildArgs bỏ audio khi hasAudio=false', () => {
 test('buildArgs dùng crf tuỳ chỉnh', () => {
   const args = buildArgs({ input: 'i', output: 'o', segments: [[0, 1]], hasAudio: false, crf: 23 });
   assert.strictEqual(args[args.indexOf('-crf') + 1], '23');
+});
+
+test('buildArgs thêm -r khi có fps (ép frame rate gốc)', () => {
+  const args = buildArgs({ input: 'i', output: 'o', segments: [[0, 1]], hasAudio: false, fps: '30/1' });
+  assert.strictEqual(args[args.indexOf('-r') + 1], '30/1');
+});
+
+test('buildArgs không thêm -r khi thiếu fps', () => {
+  const args = buildArgs({ input: 'i', output: 'o', segments: [[0, 1]], hasAudio: false });
+  assert.ok(!args.includes('-r'));
+});
+
+test('validFps chấp nhận num/den hợp lệ, loại bỏ 0/0 và rác', () => {
+  assert.strictEqual(validFps('30/1'), '30/1');
+  assert.strictEqual(validFps('30000/1001'), '30000/1001');
+  assert.strictEqual(validFps('0/0'), null);
+  assert.strictEqual(validFps('25'), null);
+  assert.strictEqual(validFps(undefined), null);
+  assert.strictEqual(validFps(null), null);
 });

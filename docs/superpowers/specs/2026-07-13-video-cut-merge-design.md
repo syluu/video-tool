@@ -76,12 +76,16 @@ Với danh sách đoạn `[[s0,e0],[s1,e1],...]`:
   `setpts=PTS-STARTPTS`, vì các đoạn giữ lại không liền nhau — nếu chỉ offset PTS sẽ
   để lại khoảng trống (frame đứng hình) giữa các đoạn.
 - Nếu có audio: `aselect='between(t,...)+...',asetpts=N/SR/TB` (đánh số lại mẫu audio).
+- **Ép frame rate:** thêm `-r <fps gốc>` (lấy từ `r_frame_rate` của ffprobe). Nếu bỏ, sau khi
+  `setpts` đánh số lại frame, ffmpeg tự chọn frame rate đầu ra và **rớt frame** (ví dụ 30fps →
+  25fps). Đã xác minh ở Task 9: có `-r 30/1` → giữ 30fps, đủ frame, audio đồng bộ.
 - Lệnh:
   ```
   ffmpeg -y -i INPUT \
     -vf "select='<expr>',setpts=N/FRAME_RATE/TB" \
     -af "aselect='<expr>',asetpts=N/SR/TB" \   # bỏ nếu không có audio
     -c:v libx264 -crf 20 -preset veryfast \
+    -r <fps gốc> \
     -c:a aac -b:a 128k \
     OUTPUT
   ```

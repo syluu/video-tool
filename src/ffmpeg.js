@@ -5,13 +5,29 @@ function buildSelectExpr(segments) {
   return segments.map(([s, e]) => `between(t,${s},${e})`).join('+');
 }
 
-function buildArgs({ input, output, segments, hasAudio, crf = 20 }) {
+// Trả về chuỗi "num/den" hợp lệ (>0) hoặc null. Dùng cho r_frame_rate của ffprobe.
+function validFps(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.match(/^(\d+)\/(\d+)$/);
+  if (!m) return null;
+  const num = Number(m[1]);
+  const den = Number(m[2]);
+  if (num <= 0 || den <= 0) return null;
+  return s;
+}
+
+function buildArgs({ input, output, segments, hasAudio, fps, crf = 20 }) {
   const expr = buildSelectExpr(segments);
   const args = ['-y', '-i', input, '-vf', `select='${expr}',setpts=N/FRAME_RATE/TB`];
   if (hasAudio) {
     args.push('-af', `aselect='${expr}',asetpts=N/SR/TB`);
   }
   args.push('-c:v', 'libx264', '-crf', String(crf), '-preset', 'veryfast');
+  // Ép frame rate đầu ra = frame rate gốc. Nếu bỏ, ffmpeg tự chọn fps sau khi
+  // setpts đánh số lại và sẽ DROP frame (ví dụ 30fps -> 25fps). Xem Task 9.
+  if (fps) {
+    args.push('-r', String(fps));
+  }
   if (hasAudio) {
     args.push('-c:a', 'aac', '-b:a', '128k');
   }
@@ -39,7 +55,7 @@ async function checkFfmpeg() {
 
 function probe(file) {
   return new Promise((resolve, reject) => {
-    const args = ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type', '-of', 'json', file];
+    const args = ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,r_frame_rate', '-of', 'json', file];
     const p = spawn('ffprobe', args);
     let out = '';
     let err = '';
@@ -50,10 +66,13 @@ function probe(file) {
       if (code !== 0) return reject(new Error(err.trim() || `ffprobe thoát mã ${code}`));
       try {
         const json = JSON.parse(out);
+        const streams = json.streams || [];
         const duration = parseFloat(json.format && json.format.duration);
-        const hasAudio = (json.streams || []).some((s) => s.codec_type === 'audio');
+        const hasAudio = streams.some((s) => s.codec_type === 'audio');
+        const vStream = streams.find((s) => s.codec_type === 'video');
+        const fps = validFps(vStream && vStream.r_frame_rate);
         if (!Number.isFinite(duration)) return reject(new Error('Không đọc được thời lượng video'));
-        resolve({ duration, hasAudio });
+        resolve({ duration, hasAudio, fps });
       } catch (e) {
         reject(e);
       }
@@ -84,4 +103,4 @@ function runCut(opts, { onProgress, signal } = {}) {
   });
 }
 
-module.exports = { buildSelectExpr, buildArgs, checkFfmpeg, probe, runCut };
+module.exports = { buildSelectExpr, buildArgs, validFps, checkFfmpeg, probe, runCut };

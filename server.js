@@ -59,7 +59,11 @@ app.post('/api/process', async (req, res) => {
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
   const ac = new AbortController();
-  req.on('close', () => ac.abort());
+  // Chỉ hủy khi client thực sự ngắt kết nối giữa chừng (response chưa hoàn tất).
+  // Lưu ý: KHÔNG dùng req.on('close') vì nó bắn ngay khi body POST được nhận xong.
+  res.on('close', () => {
+    if (!res.writableFinished) ac.abort();
+  });
 
   try {
     const health = await checkFfmpeg();
@@ -85,7 +89,7 @@ app.post('/api/process', async (req, res) => {
       const v = videos[i];
       send('log', { message: `(${i + 1}/${videos.length}) Đang xử lý ${v.name}` });
       try {
-        const { duration, hasAudio } = await probe(v.path);
+        const { duration, hasAudio, fps } = await probe(v.path);
         const segments = planSegments(duration, { keepMin, keepMax, gapMin, gapMax });
         if (!segments.length) {
           send('log', { message: `Bỏ qua ${v.name}: video quá ngắn`, level: 'warn' });
@@ -94,7 +98,7 @@ app.post('/api/process', async (req, res) => {
         const base = v.name.replace(/\.[^.]+$/, '');
         const outFile = path.join(out, `${base}_cut.mp4`);
         await runCut(
-          { input: v.path, output: outFile, segments, hasAudio, crf: 20 },
+          { input: v.path, output: outFile, segments, hasAudio, fps, crf: 20 },
           {
             signal: ac.signal,
             onProgress: (pct) => send('progress', { file: v.name, index: i, total: videos.length, pct }),
