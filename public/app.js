@@ -81,6 +81,7 @@ $('btnScan').addEventListener('click', async () => {
 
 // ---------- Modal chọn thư mục ----------
 let modalCurrent = '';
+let modalTargetId = 'folder'; // id ô input sẽ nhận đường dẫn khi bấm "Chọn thư mục này"
 async function openModal(startPath) {
   const res = await fetch('/api/browse', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -101,11 +102,12 @@ async function openModal(startPath) {
   });
   $('modal').classList.remove('hidden');
 }
-$('btnBrowse').addEventListener('click', () => openModal($('folder').value.trim()));
+$('btnBrowse').addEventListener('click', () => { modalTargetId = 'folder'; openModal($('folder').value.trim()); });
+$('btnBrowseOut').addEventListener('click', () => { modalTargetId = 'outDir'; openModal($('outDir').value.trim()); });
 $('modalUp').addEventListener('click', () => { if ($('modalUp').dataset.path) openModal($('modalUp').dataset.path); });
 $('modalClose').addEventListener('click', () => $('modal').classList.add('hidden'));
 $('modalPick').addEventListener('click', () => {
-  $('folder').value = modalCurrent;
+  $(modalTargetId).value = modalCurrent;
   $('modal').classList.add('hidden');
 });
 
