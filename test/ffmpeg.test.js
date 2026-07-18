@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
-const { buildSelectExpr, buildArgs, validFps, resolveBinary } = require('../src/ffmpeg');
+const { buildSelectExpr, buildArgs, validFps, resolveBinary, MAX_BATCH_SIZE, chunkArray } = require('../src/ffmpeg');
 
 test('buildSelectExpr nối các đoạn bằng dấu +', () => {
   assert.strictEqual(
@@ -89,4 +89,22 @@ test('resolveBinary: đóng gói nhưng không thấy file cạnh exe -> fallbac
     env: {}, isPackaged: true, platform: 'win32', execDir: '/opt/app', exists: () => false,
   });
   assert.strictEqual(r, 'ffmpeg');
+});
+
+test('MAX_BATCH_SIZE mặc định là 40', () => {
+  assert.strictEqual(MAX_BATCH_SIZE, 40);
+});
+
+test('chunkArray chia đều mảng', () => {
+  const arr = [1, 2, 3, 4, 5];
+  assert.deepStrictEqual(chunkArray(arr, 2), [[1, 2], [3, 4], [5]]);
+});
+
+test('chunkArray trả nguyên mảng khi size >= length', () => {
+  assert.deepStrictEqual(chunkArray([1, 2, 3], 5), [[1, 2, 3]]);
+  assert.deepStrictEqual(chunkArray([1, 2, 3], 3), [[1, 2, 3]]);
+});
+
+test('chunkArray với mảng rỗng', () => {
+  assert.deepStrictEqual(chunkArray([], 5), []);
 });

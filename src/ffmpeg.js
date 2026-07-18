@@ -1,7 +1,9 @@
 'use strict';
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const fsp = require('node:fs/promises');
 const path = require('node:path');
+const os = require('node:os');
 
 // Xác định đường dẫn binary ffmpeg/ffprobe theo thứ tự ưu tiên:
 //   1. Biến môi trường FFMPEG_PATH / FFPROBE_PATH
@@ -108,19 +110,24 @@ function probe(file) {
   });
 }
 
-function runCut(opts, { onProgress, signal } = {}) {
+// Số lượng segment tối đa trong mỗi batch FFmpeg. Giữ đủ nhỏ để biểu thức
+// select filter không vượt giới hạn parser/memory của FFmpeg.
+const MAX_BATCH_SIZE = 40;
+
+// Chạy 1 lần FFmpeg cho 1 nhóm segments (dùng nội bộ).
+function _runSingle(opts, { onProgress, signal, totalKeep } = {}) {
   return new Promise((resolve, reject) => {
     const args = buildArgs(opts);
-    const totalKeep = opts.segments.reduce((a, [s, e]) => a + (e - s), 0);
+    const keep = totalKeep ?? opts.segments.reduce((a, [s, e]) => a + (e - s), 0);
     const p = spawn(resolveBinary('ffmpeg'), args, { signal });
     let err = '';
     p.stderr.on('data', (d) => {
       const s = d.toString();
       err += s;
       const m = s.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
-      if (m && onProgress && totalKeep > 0) {
+      if (m && onProgress && keep > 0) {
         const t = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]);
-        onProgress(Math.min(1, t / totalKeep));
+        onProgress(Math.min(1, t / keep));
       }
     });
     p.on('error', reject);
@@ -131,4 +138,87 @@ function runCut(opts, { onProgress, signal } = {}) {
   });
 }
 
-module.exports = { buildSelectExpr, buildArgs, validFps, resolveBinary, checkFfmpeg, probe, runCut };
+// Ghép nhiều file mp4 bằng concat demuxer.
+function _concatFiles(inputs, output, { signal } = {}) {
+  return new Promise((resolve, reject) => {
+    // Tạo file danh sách tạm cho concat demuxer
+    const listFile = output + '.concat.txt';
+    const content = inputs.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
+    fs.writeFileSync(listFile, content);
+    const args = ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', output];
+    const p = spawn(resolveBinary('ffmpeg'), args, { signal });
+    let err = '';
+    p.stderr.on('data', (d) => { err += d.toString(); });
+    p.on('error', (e) => { tryUnlink(listFile); reject(e); });
+    p.on('close', (code) => {
+      tryUnlink(listFile);
+      if (code === 0) resolve();
+      else reject(new Error(err.split('\n').filter(Boolean).slice(-4).join(' | ') || `ffmpeg concat thoát mã ${code}`));
+    });
+  });
+}
+
+function tryUnlink(filePath) {
+  try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+}
+
+// Chia mảng thành các nhóm nhỏ.
+function chunkArray(arr, size) {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+/**
+ * Cắt video: nếu ≤ MAX_BATCH_SIZE segments thì chạy trực tiếp,
+ * nếu nhiều hơn thì chia batch, xử lý từng batch thành file tạm rồi concat.
+ */
+async function runCut(opts, { onProgress, signal } = {}) {
+  const { segments } = opts;
+  if (segments.length <= MAX_BATCH_SIZE) {
+    // Trường hợp bình thường — chạy thẳng 1 lệnh FFmpeg.
+    return _runSingle(opts, { onProgress, signal });
+  }
+
+  // --- Chia batch cho video dài ---
+  const batches = chunkArray(segments, MAX_BATCH_SIZE);
+  const totalKeep = segments.reduce((a, [s, e]) => a + (e - s), 0);
+  let accumulated = 0; // thời lượng đã xử lý xong (tính progress tổng)
+  const tempFiles = [];
+
+  try {
+    for (let bi = 0; bi < batches.length; bi++) {
+      if (signal && signal.aborted) break;
+      const batch = batches[bi];
+      const batchKeep = batch.reduce((a, [s, e]) => a + (e - s), 0);
+      const tempFile = opts.output + `.part${bi}.mp4`;
+      tempFiles.push(tempFile);
+
+      const batchAccum = accumulated; // capture cho closure
+      await _runSingle(
+        { ...opts, output: tempFile, segments: batch },
+        {
+          signal,
+          onProgress: onProgress
+            ? (batchPct) => {
+                const done = batchAccum + batchPct * batchKeep;
+                onProgress(Math.min(1, done / totalKeep));
+              }
+            : undefined,
+          totalKeep: batchKeep,
+        }
+      );
+      accumulated += batchKeep;
+    }
+
+    // Ghép các file tạm thành file cuối
+    await _concatFiles(tempFiles, opts.output, { signal });
+  } finally {
+    // Dọn file tạm
+    for (const f of tempFiles) tryUnlink(f);
+  }
+}
+
+module.exports = { buildSelectExpr, buildArgs, validFps, resolveBinary, checkFfmpeg, probe, runCut, MAX_BATCH_SIZE, chunkArray, _runSingle, _concatFiles };
